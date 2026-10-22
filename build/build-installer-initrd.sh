@@ -3,7 +3,7 @@
 #
 # debootstraps a Debian Trixie rootfs, installs install-time tooling into it,
 # runs systemd as PID 1 (/init -> /sbin/init, networking via systemd-networkd)
-# with a oneshot klargoring-installer.service running ../installer/main.py -- the
+# with a oneshot saekkevogn-installer.service running ../installer/main.py -- the
 # real Stage 2 installer (disk detection, ZFS mirror, target debootstrap,
 # Proxmox repo+packages, GRUB, first-boot service) -- then packs the whole
 # rootfs into an xz'd cpio initrd alongside its matching kernel. This script
@@ -21,9 +21,12 @@
 # Must run as root (debootstrap/chroot/mount all require it):
 #   sudo bash build/build-installer-initrd.sh [output-dir]
 #
-# ARCH=amd64|arm64 (env var, default amd64) selects the target architecture.
-# Output lands in <output-dir>/<ARCH>/, so amd64 and arm64 builds never
-# collide. Cross-building (ARCH different from this host's own architecture)
+# ARCH (env var, default amd64) selects the target architecture. Only amd64
+# is accepted: the PBS repo's own Release file lists "Architectures: amd64"
+# and has no binary-arm64 index (checked 2026-10-22), unlike PVE, which is
+# why Klargøring builds arm64 and Sækkevogn doesn't. The ARCH plumbing and
+# <output-dir>/<ARCH>/ layout are kept from Klargøring so arm64 is a small
+# change if Proxmox ever publishes it. Cross-building (ARCH different from this host's own architecture)
 # needs qemu-user-static installed on the build host -- see the debootstrap
 # step below.
 #
@@ -51,14 +54,18 @@ fi
 
 SUITE="${SUITE:-trixie}"
 ARCH="${ARCH:-amd64}"
+if [ "$ARCH" != "amd64" ]; then
+  echo "error: ARCH=$ARCH not supported -- Proxmox publishes PBS for amd64 only" >&2
+  exit 1
+fi
 MIRROR="http://deb.debian.org/debian/"
-# Per-architecture output subfolder -- amd64 and arm64 builds never overwrite
+# Per-architecture output subfolder -- different-arch builds never overwrite
 # each other, and every downstream write below just uses $OUTDIR unchanged.
 OUTDIR="$(realpath -m "${1:-$(pwd)/output}")/$ARCH"
-WORKDIR="$(mktemp -d /var/tmp/klargoring-initrd-build.XXXXXX)"
+WORKDIR="$(mktemp -d /var/tmp/saekkevogn-initrd-build.XXXXXX)"
 ROOTFS="$WORKDIR/rootfs"
 
-log() { echo "[klargoring-build] $*" >&2; }
+log() { echo "[saekkevogn-build] $*" >&2; }
 
 cleanup() {
   log "cleaning up bind mounts under $ROOTFS"
@@ -180,17 +187,17 @@ EOF
 done
 
 # Remote debug access via sshd, deliberately username+password
-# (root/klargoring) rather than a baked-in key: this project is intended
+# (root/saekkevogn) rather than a baked-in key: this project is intended
 # to go public, and a private key baked into a publicly-distributed image
 # either exposes an estate-internal credential or is useless to anyone
 # outside that estate. A documented, fixed default credential -- for this
 # transient, PXE-booted installer environment only, never the installed
 # target -- works for everyone who has the image, which is the actual
 # point of it being public.
-log "setting root:klargoring and enabling sshd for remote debug access"
-chroot "$ROOTFS" bash -c 'echo "root:klargoring" | chpasswd'
+log "setting root:saekkevogn and enabling sshd for remote debug access"
+chroot "$ROOTFS" bash -c 'echo "root:saekkevogn" | chpasswd'
 mkdir -p "$ROOTFS/etc/ssh/sshd_config.d"
-cat > "$ROOTFS/etc/ssh/sshd_config.d/klargoring-debug.conf" <<'EOF'
+cat > "$ROOTFS/etc/ssh/sshd_config.d/saekkevogn-debug.conf" <<'EOF'
 PermitRootLogin yes
 PasswordAuthentication yes
 EOF
@@ -206,23 +213,23 @@ chroot "$ROOTFS" systemctl enable ssh.service
 # time, so this has to happen at runtime, not build time, or every booted
 # instance would share one fixed hostname. Runs as early as possible
 # (sysinit.target, Before= anything that might display/advertise it) so
-# getty/sshd/klargoring-installer all see the real value, not a placeholder.
-cat > "$ROOTFS/etc/systemd/system/klargoring-random-hostname.service" <<'EOF'
+# getty/sshd/saekkevogn-installer all see the real value, not a placeholder.
+cat > "$ROOTFS/etc/systemd/system/saekkevogn-random-hostname.service" <<'EOF'
 [Unit]
-Description=klargoring random hostname
-Before=getty@tty1.service serial-getty@ttyS0.service ssh.service klargoring-installer.service
+Description=saekkevogn random hostname
+Before=getty@tty1.service serial-getty@ttyS0.service ssh.service saekkevogn-installer.service
 DefaultDependencies=no
 Conflicts=shutdown.target
 
 [Service]
 Type=oneshot
 RemainAfterExit=yes
-ExecStart=/bin/sh -c 'h="klargoring-$(head -c4 /dev/urandom | od -An -tx1 | tr -d " \n")"; echo "$h" > /etc/hostname; hostname "$h"'
+ExecStart=/bin/sh -c 'h="saekkevogn-$(head -c4 /dev/urandom | od -An -tx1 | tr -d " \n")"; echo "$h" > /etc/hostname; hostname "$h"'
 
 [Install]
 WantedBy=sysinit.target
 EOF
-chroot "$ROOTFS" systemctl enable klargoring-random-hostname.service
+chroot "$ROOTFS" systemctl enable saekkevogn-random-hostname.service
 
 # No automatic interactive keyboard-layout picker: every real deployment
 # of this initrd runs unattended over PXE, so a prompt requiring physical
@@ -232,29 +239,29 @@ chroot "$ROOTFS" systemctl enable klargoring-random-hostname.service
 # keyboard-configuration` interactively) -- kbd is installed for exactly
 # this, on demand, not on every boot.
 
-log "[7/10] installing the klargoring installer package + service unit"
+log "[7/10] installing the saekkevogn installer package + service unit"
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-mkdir -p "$ROOTFS/opt/klargoring"
-cp -a "$REPO_ROOT/installer" "$ROOTFS/opt/klargoring/installer"
-chmod +x "$ROOTFS/opt/klargoring/installer/main.py"
+mkdir -p "$ROOTFS/opt/saekkevogn"
+cp -a "$REPO_ROOT/installer" "$ROOTFS/opt/saekkevogn/installer"
+chmod +x "$ROOTFS/opt/saekkevogn/installer/main.py"
 
-cat > "$ROOTFS/etc/systemd/system/klargoring-installer.service" <<'EOF'
+cat > "$ROOTFS/etc/systemd/system/saekkevogn-installer.service" <<'EOF'
 [Unit]
-Description=klargoring installer
+Description=saekkevogn installer
 After=network-online.target
 Wants=network-online.target
 
 [Service]
 Type=oneshot
 RemainAfterExit=yes
-ExecStart=/usr/bin/python3 /opt/klargoring/installer/main.py
+ExecStart=/usr/bin/python3 /opt/saekkevogn/installer/main.py
 StandardOutput=journal+console
 StandardError=journal+console
 
 [Install]
 WantedBy=multi-user.target
 EOF
-chroot "$ROOTFS" systemctl enable klargoring-installer.service
+chroot "$ROOTFS" systemctl enable saekkevogn-installer.service
 
 log "[8/10] extracting matching kernel"
 KERNEL="$(ls "$ROOTFS"/boot/vmlinuz-* | sort -V | tail -1)"

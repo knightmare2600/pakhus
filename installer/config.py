@@ -42,7 +42,12 @@ def validate(config):
             f"filesystem={config['disk-setup']['filesystem']!r} not supported yet (only 'zfs')"
         )
 
-    raid = config["disk-setup"].get("zfs.raid", "raid1")
+    # `zfs.raid = "raid1"` is a TOML dotted key: tomllib parses it as a
+    # nested table, {"zfs": {"raid": "raid1"}}, never a literal "zfs.raid"
+    # key -- the earlier .get("zfs.raid", ...) (inherited from Klargøring)
+    # never matched and always fell back to its default, so a TOML asking
+    # for e.g. raidz1 passed validation and silently got a mirror.
+    raid = config["disk-setup"].get("zfs", {}).get("raid", "raid1")
     if raid != "raid1":
         raise ConfigError(f"zfs.raid={raid!r} not supported yet (only 'raid1' mirror)")
     if raid == "raid1" and len(disks) != 2:

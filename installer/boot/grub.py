@@ -52,10 +52,13 @@ def install(chroot, disks, root_dataset, log):
                input=f"grub-pc grub-pc/install_devices multiselect {disk_paths}\n",
                text=True)
 
-    # proxmox-ve's own dependency chain already pulls in ONE of grub-pc /
-    # grub-efi-amd64 via an unconstrained "grub-pc | grub-efi-amd64"
-    # alternative -- apt's solver picks without inspecting real firmware, so
-    # whichever it landed on may not match this machine's actual boot mode.
+    # In Klargøring, proxmox-ve's own dependency chain already pulled in
+    # ONE of grub-pc / grub-efi-amd64 via an unconstrained "grub-pc |
+    # grub-efi-amd64" alternative -- apt's solver picks without inspecting
+    # real firmware, so whichever it landed on may not match this machine's
+    # actual boot mode. Whether proxmox-backup's chain does the same is
+    # unverified; the logic below is correct either way, since it installs
+    # the right package explicitly regardless of what is already there.
     # Detect real firmware mode from THIS booted environment (running on
     # the same machine as the target) and make sure the matching package --
     # and only the matching one -- ends up installed; apt will remove the
@@ -63,10 +66,10 @@ def install(chroot, disks, root_dataset, log):
     # being explicitly requested this time.
     uefi = os.path.exists("/sys/firmware/efi")
     log.info(f"firmware mode detected: {'UEFI' if uefi else 'legacy BIOS'}")
-    # arm64 Proxmox hosts are UEFI+ACPI only (no legacy BIOS at all --
-    # confirmed via Proxmox's own arm64 announcement), so this always takes
-    # the UEFI branch there; the package name still needs the real arch,
-    # same detection approach as osutil/debootstrap.py.
+    # Sækkevogn is amd64-only (the PBS repo publishes no arm64 packages),
+    # so this always resolves to amd64 today. Detection is kept from
+    # Klargøring (which also builds arm64) rather than hardcoded, same
+    # approach as osutil/debootstrap.py.
     arch = subprocess.run(["dpkg", "--print-architecture"], capture_output=True,
                            text=True, check=True).stdout.strip()
     grub_pkg = f"grub-efi-{arch}" if uefi else "grub-pc"

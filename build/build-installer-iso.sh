@@ -4,15 +4,13 @@
 # (separate local-console/serial-console entries). Does not build the
 # kernel/initrd itself.
 #
-# ARCH=amd64|arm64 (env var, default amd64) -- must match the ARCH used for
+# ARCH (env var, default amd64; only amd64 is supported, see
+# build-installer-initrd.sh for why) -- must match the ARCH used for
 # build-installer-initrd.sh, since it reads from and writes to the same
 # per-arch subfolder convention (<dir>/<ARCH>/).
 #
 # amd64 produces a hybrid BIOS+UEFI ISO: needs grub-pc-bin grub-efi-amd64-bin
-# xorriso mtools. arm64 Proxmox hosts are UEFI-only (no legacy BIOS at all),
-# so an arm64 ISO only needs grub-efi-arm64-bin xorriso mtools -- grub-pc-bin
-# is neither needed nor useful there. Does not need root, unlike
-# build-installer-initrd.sh.
+# xorriso mtools. Does not need root, unlike build-installer-initrd.sh.
 #
 # Usage: bash build/build-installer-iso.sh <initrd-build-output-dir> [iso-output-dir]
 
@@ -21,10 +19,10 @@ set -euo pipefail
 ARCH="${ARCH:-amd64}"
 SRCDIR="$(realpath "${1:?usage: $0 <initrd-build-output-dir> [iso-output-dir]}")/$ARCH"
 OUTDIR="$(realpath -m "${2:-$(pwd)/output}")/$ARCH"
-WORKDIR="$(mktemp -d /var/tmp/klargoring-iso-build.XXXXXX)"
+WORKDIR="$(mktemp -d /var/tmp/saekkevogn-iso-build.XXXXXX)"
 ISOROOT="$WORKDIR/isoroot"
 
-log() { echo "[klargoring-iso-build] $*" >&2; }
+log() { echo "[saekkevogn-iso-build] $*" >&2; }
 
 trap 'rm -rf "$WORKDIR"' EXIT
 
@@ -50,8 +48,7 @@ done
 # up a stray boot entry for the other. Not handled here.
 case "$ARCH" in
   amd64) GRUB_PLATFORM="x86_64-efi"; GRUB_PKG_HINT="grub-efi-amd64-bin" ;;
-  arm64) GRUB_PLATFORM="arm64-efi"; GRUB_PKG_HINT="grub-efi-arm64-bin" ;;
-  *) echo "error: unknown ARCH=$ARCH -- expected amd64 or arm64" >&2; exit 1 ;;
+  *) echo "error: ARCH=$ARCH not supported -- Proxmox publishes PBS for amd64 only" >&2; exit 1 ;;
 esac
 if [ ! -d "/usr/lib/grub/$GRUB_PLATFORM" ]; then
   echo "error: /usr/lib/grub/$GRUB_PLATFORM not found -- install $GRUB_PKG_HINT" >&2
@@ -63,8 +60,8 @@ cp "$SRCDIR/vmlinuz" "$ISOROOT/boot/vmlinuz"
 cp "$SRCDIR/installer-initrd.img" "$ISOROOT/boot/installer-initrd.img"
 cp "$(dirname "$(realpath "$0")")/grub.cfg" "$ISOROOT/boot/grub/grub.cfg"
 
-log "grub-mkrescue ($ARCH, $GRUB_PLATFORM) -> $OUTDIR/klargoring-installer.iso"
-grub-mkrescue -o "$OUTDIR/klargoring-installer.iso" "$ISOROOT" >&2
+log "grub-mkrescue ($ARCH, $GRUB_PLATFORM) -> $OUTDIR/saekkevogn-installer.iso"
+grub-mkrescue -o "$OUTDIR/saekkevogn-installer.iso" "$ISOROOT" >&2
 
 log "done."
-du -h "$OUTDIR/klargoring-installer.iso"
+du -h "$OUTDIR/saekkevogn-installer.iso"
