@@ -84,8 +84,12 @@ def main(log):
         chroot_mod.inject_root_password(target, config["global"]["root-password-hashed"], log)
         chroot_mod.inject_ssh_keys(target, config["global"]["root-ssh-keys"], log)
 
-        repository.add_repository(target, log)
-        packages.install(ch, log)
+        # Same detection as osutil/debootstrap.py and boot/grub.py: the
+        # running environment's own arch is the target's, never assumed.
+        arch = subprocess.run(["dpkg", "--print-architecture"], capture_output=True,
+                              text=True, check=True).stdout.strip()
+        repository.add_repository(target, arch, log)
+        packages.install(ch, arch, log)
         # packages.install() is what installs ifupdown2 (and, on PVE, what
         # generated /etc/network/interfaces' "inet manual" stanza) -- must
         # run after it, not before. See write_network() for the PBS case.

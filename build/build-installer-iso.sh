@@ -4,13 +4,15 @@
 # (separate local-console/serial-console entries). Does not build the
 # kernel/initrd itself.
 #
-# ARCH (env var, default amd64; only amd64 is supported, see
-# build-installer-initrd.sh for why) -- must match the ARCH used for
+# ARCH=amd64|arm64 (env var, default amd64) -- must match the ARCH used for
 # build-installer-initrd.sh, since it reads from and writes to the same
 # per-arch subfolder convention (<dir>/<ARCH>/).
 #
 # amd64 produces a hybrid BIOS+UEFI ISO: needs grub-pc-bin grub-efi-amd64-bin
-# xorriso mtools. Does not need root, unlike build-installer-initrd.sh.
+# xorriso mtools. arm64 Proxmox hosts are UEFI-only (no legacy BIOS at all),
+# so an arm64 ISO only needs grub-efi-arm64-bin xorriso mtools -- grub-pc-bin
+# is neither needed nor useful there. Does not need root, unlike
+# build-installer-initrd.sh.
 #
 # Usage: bash build/build-installer-iso.sh <initrd-build-output-dir> [iso-output-dir]
 
@@ -48,7 +50,8 @@ done
 # up a stray boot entry for the other. Not handled here.
 case "$ARCH" in
   amd64) GRUB_PLATFORM="x86_64-efi"; GRUB_PKG_HINT="grub-efi-amd64-bin" ;;
-  *) echo "error: ARCH=$ARCH not supported -- Proxmox publishes PBS for amd64 only" >&2; exit 1 ;;
+  arm64) GRUB_PLATFORM="arm64-efi"; GRUB_PKG_HINT="grub-efi-arm64-bin" ;;
+  *) echo "error: unknown ARCH=$ARCH -- expected amd64 or arm64" >&2; exit 1 ;;
 esac
 if [ ! -d "/usr/lib/grub/$GRUB_PLATFORM" ]; then
   echo "error: /usr/lib/grub/$GRUB_PLATFORM not found -- install $GRUB_PKG_HINT" >&2

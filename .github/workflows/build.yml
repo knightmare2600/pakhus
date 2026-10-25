@@ -6,11 +6,18 @@ name: Build installer initrd + ISO
 # read from the environment (script defaults: trixie/amd64) so these
 # inputs drive them without touching the scripts' own logic.
 #
-# amd64 only: the PBS repo publishes no arm64 packages (its Release file
-# lists "Architectures: amd64", checked 2026-10-22), unlike PVE -- so
-# Klargøring's arm64 matrix leg (native ubuntu-24.04-arm runner) is dropped
-# here. The matrix shape is kept with a single entry so arm64 is a small
-# change if Proxmox ever publishes it.
+# Builds both amd64 and arm64 as a matrix. arm64 uses GitHub's native
+# arm64-hosted runner (ubuntu-24.04-arm, free for public repos as of the
+# 2025-01-16 public preview) rather than cross-building under emulation --
+# simpler and faster than qemu-user-static, and this repo is public so the
+# label is available. build-installer-initrd.sh still supports cross-
+# building via qemu-debootstrap on its own (see its comments) for anyone
+# running it outside this workflow on a single amd64 host.
+#
+# The initrd is plain Debian on both arches -- nothing PBS-specific is
+# built here. arm64's unofficial PBS server package (qemus/proxmox-backup-
+# arm64) is fetched and pin-checked at install time by
+# installer/proxmox/packages.py, not baked into this build.
 on:
   workflow_dispatch:
     inputs:
@@ -31,10 +38,12 @@ jobs:
   build-initrd:
     strategy:
       matrix:
-        arch: [amd64]
+        arch: [amd64, arm64]
         include:
           - arch: amd64
             runner: ubuntu-latest
+          - arch: arm64
+            runner: ubuntu-24.04-arm
     runs-on: ${{ matrix.runner }}
     steps:
       - name: Checkout
@@ -66,11 +75,20 @@ jobs:
     needs: build-initrd
     strategy:
       matrix:
-        arch: [amd64]
+        arch: [amd64, arm64]
         include:
+          # arm64 is UEFI-only (no legacy BIOS at all -- confirmed via
+          # Proxmox's own arm64 announcement), so its ISO only needs the
+          # arm64 EFI platform, never grub-pc-bin. Keeping the two
+          # architectures' package lists disjoint also avoids the
+          # cross-contamination caveat noted in build-installer-iso.sh
+          # (grub-mkrescue embeds every GRUB platform it finds installed).
           - arch: amd64
             runner: ubuntu-latest
             grub_pkgs: "grub-pc-bin grub-efi-amd64-bin"
+          - arch: arm64
+            runner: ubuntu-24.04-arm
+            grub_pkgs: "grub-efi-arm64-bin"
     runs-on: ${{ matrix.runner }}
     steps:
       - name: Checkout
@@ -110,21 +128,39 @@ jobs:
           name: installer-initrd-${{ inputs.debian_suite }}-amd64
           path: dl/initrd-amd64
 
+      - name: Download arm64 initrd + kernel
+        uses: actions/download-artifact@v4
+        with:
+          name: installer-initrd-${{ inputs.debian_suite }}-arm64
+          path: dl/initrd-arm64
+
       - name: Download amd64 ISO
         uses: actions/download-artifact@v4
         with:
           name: installer-iso-${{ inputs.debian_suite }}-amd64
           path: dl/iso-amd64
 
-      # Arch-suffixed asset names kept from Klargøring even with one arch:
-      # same naming as its releases, and no rename needed if arm64 returns.
+      - name: Download arm64 ISO
+        uses: actions/download-artifact@v4
+        with:
+          name: installer-iso-${{ inputs.debian_suite }}-arm64
+          path: dl/iso-arm64
+
+      # GitHub Releases are a flat asset namespace, and every arch's files
+      # share the same base filename (vmlinuz, installer-initrd.img, ...)
+      # at download time -- they'd collide as release assets without an
+      # explicit arch-suffixed rename first.
       - name: Rename downloads to arch-suffixed release asset names
         run: |
           mkdir -p release-assets
           cp dl/initrd-amd64/installer-initrd.img release-assets/installer-initrd-amd64.img
           cp dl/initrd-amd64/vmlinuz               release-assets/vmlinuz-amd64
           cp dl/initrd-amd64/KERNEL_VERSION         release-assets/KERNEL_VERSION-amd64
+          cp dl/initrd-arm64/installer-initrd.img  release-assets/installer-initrd-arm64.img
+          cp dl/initrd-arm64/vmlinuz               release-assets/vmlinuz-arm64
+          cp dl/initrd-arm64/KERNEL_VERSION         release-assets/KERNEL_VERSION-arm64
           cp dl/iso-amd64/saekkevogn-installer.iso release-assets/saekkevogn-installer-amd64.iso
+          cp dl/iso-arm64/saekkevogn-installer.iso release-assets/saekkevogn-installer-arm64.iso
 
       - name: Determine release tag
         id: tag
@@ -147,5 +183,5 @@ jobs:
           gh release create "${{ steps.tag.outputs.tag }}" \
             --repo "${{ github.repository }}" \
             --title "saekkevogn (${{ inputs.debian_suite }}, build #${{ github.run_number }})" \
-            --notes "Automated build via workflow_dispatch (debian_suite=${{ inputs.debian_suite }}). amd64 only." \
+            --notes "Automated build via workflow_dispatch (debian_suite=${{ inputs.debian_suite }}). Includes amd64 and arm64." \
             release-assets/*

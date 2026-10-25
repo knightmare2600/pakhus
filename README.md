@@ -29,6 +29,14 @@ What has been verified for Sækkevogn so far:
 - `osutil/chroot.py`'s `write_network()` against the four
   `/etc/network/interfaces` shapes it can meet (PVE-style `inet manual`,
   lo-only, missing file, already configured), in a local test harness.
+- arm64: the qemus server package's pinned SHA-256; every one of its
+  Depends present by name in Debian trixie arm64 + the PVE arm64 repo +
+  the two Architecture: all PBS packages; and the installer's own fetch
+  functions run end to end against the real sources (server `.deb`
+  downloaded and pin-checked, a wrong pin refused, `pbs-i18n` +
+  `proxmox-backup-docs` fetched through apt's own signature checking,
+  temporary apt state cleaned up) (2026-10-25). Not checked: apt's
+  version-constraint resolution on a real arm64 system.
 - Python compiles; shell scripts pass `bash -n`; the workflow parses as YAML.
 
 Not yet verified: a real initrd build, a real install, and the first boot
@@ -38,12 +46,12 @@ of the installed system.
 
 | Area | Klargøring (PVE) | Sækkevogn (PBS) | Why |
 |---|---|---|---|
-| apt repo | `debian/pve`, `pve-no-subscription` | `debian/pbs`, `pbs-no-subscription` | PBS docs |
-| Main package | `proxmox-ve` | `proxmox-backup` | The full metapackage: Depends on `proxmox-default-kernel` and `proxmox-kernel-helper` (`proxmox-boot-tool`). `proxmox-backup-server` alone keeps the Debian kernel and pulls in neither. |
+| apt repo | `debian/pve`, `pve-no-subscription` | amd64: `debian/pbs`, `pbs-no-subscription`. arm64: `debian/pve`, `pve-no-subscription` | PBS docs; arm64 see below |
+| Main package | `proxmox-ve` | amd64: `proxmox-backup`. arm64: its Depends one by one, the server from qemus | The full metapackage: Depends on `proxmox-default-kernel` and `proxmox-kernel-helper` (`proxmox-boot-tool`). `proxmox-backup-server` alone keeps the Debian kernel and pulls in neither. |
 | `ifupdown2` | pulled in by `proxmox-ve` (hard Depends) | installed explicitly | `proxmox-backup-server` only Recommends it |
 | `open-iscsi` | installed | dropped | PVE storage-backend dependency, not needed for PBS |
 | Network config | flips PVE's generated `inet manual` stanza to `dhcp` | same, plus a fallback that writes `auto <nic>` / `inet dhcp` | See below |
-| Architectures | amd64 + arm64 | amd64 only | See below |
+| Architectures | amd64 + arm64 | amd64 + arm64 (arm64 PBS server unofficial) | See below |
 
 ### The network fallback
 
@@ -62,13 +70,46 @@ hardware. That's unverified on real PBS hardware.
 
 ## Architectures
 
-**amd64 only.** The PBS trixie repo's `Release` file lists
-`Architectures: amd64`, and `binary-arm64/` returns 404 (checked
-2026-10-22), unlike PVE, which is why Klargøring builds arm64 and this
-doesn't. The `ARCH` env var and `<output-dir>/<ARCH>/` layout are kept
-from Klargøring, but both build scripts reject anything other than
-`amd64`, and the CI matrix has a single entry. If Proxmox publishes
-arm64 PBS, re-enabling it is a small change.
+amd64 and arm64, with the same build setup as Klargøring (`ARCH=amd64|arm64`,
+`<output-dir>/<ARCH>/`, native `ubuntu-24.04-arm` CI runner). The initrd
+is plain Debian on both; everything PBS-specific happens at install time.
+
+### arm64
+
+**Proxmox publishes no arm64 PBS.** The PBS trixie repo's `Release` file
+lists `Architectures: amd64`, and `binary-arm64/` returns 404 (checked
+2026-10-22). Asked directly, gyptazy replied: "Not that I'm aware of. But
+there're third-party scripts from the community to archive this", and
+pointed at
+[qemus/proxmox-backup-arm64](https://github.com/qemus/proxmox-backup-arm64),
+whose own README says it is "not affiliated, sponsored, or endorsed by
+Proxmox Server Solutions GmbH". qemus publishes `.deb` files only, with
+no installer, so Sækkevogn wires them into the install. On arm64,
+`proxmox/packages.py` installs from three sources:
+
+| Package(s) | Source | Official? |
+|---|---|---|
+| Kernel, `proxmox-kernel-helper`, ZFS, `ifupdown2`, `proxmox-backup-client`, web toolkit, termproxy, journal reader and the rest of the server's Depends | PVE repo, which is built for `amd64 arm64` | Yes |
+| `pbs-i18n`, `proxmox-backup-docs` | PBS repo. These are Architecture: all, but only listed in its amd64 index, so they're fetched through a throwaway apt config pointed at that index. apt checks the signed `InRelease` and the `.deb` hashes as usual. | Yes |
+| `proxmox-backup-server` | qemus GitHub release, pinned by version + SHA-256 in `packages.py` | **No** |
+
+Of the 14 packages qemus ships, this needs only the one. Things to know:
+
+- **The pin is trust-on-first-use.** qemus publishes no checksums (no
+  SHA256SUMS file, and the GitHub API's per-asset digest is null for every
+  asset). The pin guarantees every install gets the same bytes, not that
+  they match Proxmox's source.
+- **No apt updates for the three non-repo packages.** The installed
+  arm64 server has no apt source for `proxmox-backup-server`, `pbs-i18n`
+  or `proxmox-backup-docs`. Everything else updates normally from the PVE
+  repo. Updating PBS itself means installing a newer qemus `.deb` by
+  hand, and bumping `QEMUS_TAG`/`QEMUS_VERSION`/`QEMUS_SHA256` in
+  `packages.py` for new installs.
+- **A PBS host tracking the PVE repo** for shared packages is this
+  project's arrangement, not something Proxmox documents.
+- Inherited from Klargøring: arm64 Proxmox hosts are UEFI-only. Whether
+  Klargøring's arm64 path has booted on real arm64 hardware is unverified;
+  its README only claims amd64 end to end.
 
 ## How it works
 
@@ -102,8 +143,9 @@ installer/          the Stage 2 installer, runs inside the booted initrd
     debootstrap.py       debootstrap onto /target
     chroot.py            bind-mount/chroot helper + target config
   proxmox/
-    repository.py        PBS apt repo + signing key (deb822, checksummed)
-    packages.py          proxmox-backup install, kernel swap, os-prober removal
+    repository.py        PBS (amd64) / PVE (arm64) apt repo + signing key
+    packages.py          proxmox-backup install (arm64: + qemus server .deb),
+                          kernel swap, os-prober removal
   boot/
     grub.py              hostid, initramfs, proxmox-boot-tool per disk
   firstboot/
@@ -127,9 +169,13 @@ examples/
 
 ```
 sudo bash build/build-installer-initrd.sh /path/to/output-dir
+# or, for arm64:
+sudo ARCH=arm64 bash build/build-installer-initrd.sh /path/to/output-dir
 ```
 
-Needs root. Produces, under `<output-dir>/amd64/`:
+Needs root. Cross-building arm64 on an amd64 host needs
+`qemu-user-static` (see the script's comments). Produces, under
+`<output-dir>/<ARCH>/`:
 
 - `installer-initrd.img`: the packed, xz-compressed initrd
 - `vmlinuz`: the matching kernel (module versions are pinned to this
@@ -146,29 +192,41 @@ For sites where PXE isn't available. Run after the initrd build:
 
 ```
 bash build/build-installer-iso.sh /path/to/initrd-output-dir /path/to/iso-output-dir
+# or, for arm64:
+ARCH=arm64 bash build/build-installer-iso.sh /path/to/initrd-output-dir /path/to/iso-output-dir
 ```
 
-No root needed. Needs `grub-pc-bin`, `grub-efi-amd64-bin`, `xorriso` and
-`mtools`, and produces a hybrid BIOS+UEFI
-`<output-dir>/amd64/saekkevogn-installer.iso`.
+No root needed. Needs `xorriso` and `mtools`, plus `grub-pc-bin` +
+`grub-efi-amd64-bin` for amd64 (a hybrid BIOS+UEFI ISO), or
+`grub-efi-arm64-bin` for arm64 (UEFI only). Produces
+`<output-dir>/<ARCH>/saekkevogn-installer.iso`.
 
 Both steps also run as a manually triggered GitHub Actions workflow
-(`.github/workflows/build.yml`, `workflow_dispatch` only), publishing
-`vmlinuz-amd64`, `installer-initrd-amd64.img`, `KERNEL_VERSION-amd64` and
-`saekkevogn-installer-amd64.iso` as a GitHub Release tagged
+(`.github/workflows/build.yml`, `workflow_dispatch` only), building both
+arches as a matrix and publishing `vmlinuz-<arch>`,
+`installer-initrd-<arch>.img`, `KERNEL_VERSION-<arch>` and
+`saekkevogn-installer-<arch>.iso` for each as a single GitHub Release tagged
 `saekkevogn-<date>-<suite>-<run-number>` (or whatever tag you pass in).
 
 ## Booting via iPXE
 
-**Proposed, not yet in the live `menu.ipxe`.** This mirrors Klargøring's
-stanza. The `-pbs-answer.toml` filename is a presumption pending
-confirmation, because `${site-prefix}-answer.toml` at that path is already
-Klargøring's PVE answer file:
+The estate's `menu.ipxe` (v2.16) carries this, mirroring Klargøring's
+stanza and file layout. The `-pbs-answer.toml` filename is a presumption
+pending confirmation, because `${site-prefix}-answer.toml` at that path is
+already Klargøring's PVE answer file:
 
 ```
 :saekkevogn
+iseq ${arch} arm64 && goto saekkevogn-arm64 || goto saekkevogn-amd64
+
+:saekkevogn-amd64
 kernel ${boot-url}/proxmox/saekkevogn/amd64/vmlinuz toml_url=${boot-url}/proxmox/${site-prefix}-pbs-answer.toml confirm-wipe no-reboot
 initrd ${boot-url}/proxmox/saekkevogn/amd64/installer-initrd.img
+boot
+
+:saekkevogn-arm64
+kernel ${boot-url}/proxmox/saekkevogn/arm64/vmlinuz-arm64 toml_url=${boot-url}/proxmox/${site-prefix}-pbs-answer.toml confirm-wipe no-reboot
+initrd ${boot-url}/proxmox/saekkevogn/arm64/installer-initrd-arm64.img
 boot
 ```
 
@@ -225,6 +283,8 @@ same contract as Klargøring, parsed field for field. See
 ## Known limitations
 
 - Untested on real hardware (see Status).
+- arm64: the PBS server package is unofficial and doesn't update via apt
+  (see "arm64" above).
 - No PBS datastore is created, and that is deliberate. The installed server comes up
   with only the ZFS root pool, and datastores are left for whoever runs
   the server to configure (the upstream answer format has no datastore

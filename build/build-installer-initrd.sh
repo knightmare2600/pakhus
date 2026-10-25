@@ -21,12 +21,9 @@
 # Must run as root (debootstrap/chroot/mount all require it):
 #   sudo bash build/build-installer-initrd.sh [output-dir]
 #
-# ARCH (env var, default amd64) selects the target architecture. Only amd64
-# is accepted: the PBS repo's own Release file lists "Architectures: amd64"
-# and has no binary-arm64 index (checked 2026-10-22), unlike PVE, which is
-# why Klargøring builds arm64 and Sækkevogn doesn't. The ARCH plumbing and
-# <output-dir>/<ARCH>/ layout are kept from Klargøring so arm64 is a small
-# change if Proxmox ever publishes it. Cross-building (ARCH different from this host's own architecture)
+# ARCH=amd64|arm64 (env var, default amd64) selects the target architecture.
+# Output lands in <output-dir>/<ARCH>/, so amd64 and arm64 builds never
+# collide. Cross-building (ARCH different from this host's own architecture)
 # needs qemu-user-static installed on the build host -- see the debootstrap
 # step below.
 #
@@ -54,12 +51,8 @@ fi
 
 SUITE="${SUITE:-trixie}"
 ARCH="${ARCH:-amd64}"
-if [ "$ARCH" != "amd64" ]; then
-  echo "error: ARCH=$ARCH not supported -- Proxmox publishes PBS for amd64 only" >&2
-  exit 1
-fi
 MIRROR="http://deb.debian.org/debian/"
-# Per-architecture output subfolder -- different-arch builds never overwrite
+# Per-architecture output subfolder -- amd64 and arm64 builds never overwrite
 # each other, and every downstream write below just uses $OUTDIR unchanged.
 OUTDIR="$(realpath -m "${1:-$(pwd)/output}")/$ARCH"
 WORKDIR="$(mktemp -d /var/tmp/saekkevogn-initrd-build.XXXXXX)"
