@@ -314,8 +314,9 @@ boot
 ```
 
 `${site-prefix}-pdm-answer.toml` follows Sækkevogn's `-pbs-` convention;
-the `-pdm-` naming is a presumption pending confirmation, and no per-site
-`-pdm-answer.toml` file exists yet. As with every entry in that menu, the
+the `-pdm-` naming is a presumption pending confirmation. The estate's
+`VRK-pdm-answer.toml` and `FRD-pdm-answer.toml` exist as of 2026-10-25,
+and both pass `installer/config.py`'s validation. As with every entry in that menu, the
 site is resolved in iPXE (gateway-based detection setting `${site-prefix}`
 and `${boot-url}`) — never hardcode one site's URL into a shared menu
 entry.
