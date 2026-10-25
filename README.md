@@ -346,11 +346,17 @@ without touching any disk.
   `ram`, `sr`, `fd` and `dm-` devices): 2 or more uses `toml_url=`, fewer
   uses this one and logs that the build is "single-disk, NOT production
   ready". Without it, `toml_url=` is always used.
-- `confirm-wipe`: intended for interactive/manual runs. **It currently
-  doesn't prompt.** The code only checks that `confirm-wipe` or
-  `unattended` is present, so today the two behave identically and the
-  disks are wiped without asking.
-- `unattended`: production PXE use.
+- `confirm-wipe`: interactive/manual runs, and what the estate's
+  `menu.ipxe` entries pass.
+  Shows the disks about to be erased on the local console (`tty1`) and
+  the serial console (`ttyS0`), and waits for an operator to type `YES`
+  on either one. Anything else, or no usable console, aborts without
+  touching a disk. While the prompt is up, the autologin shells on those
+  two consoles are stopped (they'd otherwise take half the keystrokes) and
+  restarted afterwards; SSH still works. If `unattended` is passed as
+  well, `confirm-wipe` wins and it still asks.
+- `unattended`: production PXE use. No prompt: proceeds straight to
+  wiping the disks listed in the answer file.
 - `no-reboot`: stay up after a successful install, for inspection.
 
 **The installer refuses to touch any disk unless `confirm-wipe` or
@@ -366,7 +372,8 @@ toml_url=http://192.168.139.50/proxmox/VRK-pdm-answer.toml unattended
 
 ## Debugging a booted instance
 
-- Console autologin as root on `tty1` and `ttyS0`.
+- Console autologin as root on `tty1` and `ttyS0`, except while the
+  `confirm-wipe` prompt is waiting for an answer.
 - SSH: `ssh root@<hostname-or-ip>`, password `pakhus`. Deliberately a
   documented password rather than a baked-in key, since the image is
   public. It applies only to the transient installer environment, never

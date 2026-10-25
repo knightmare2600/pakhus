@@ -18,6 +18,7 @@ import subprocess
 import sys
 
 import config as config_mod
+import confirm
 import logger as logger_mod
 from storage import detect, partition, zfs
 from osutil import debootstrap, chroot as chroot_mod
@@ -80,6 +81,12 @@ def main(log):
                   "was passed on the kernel cmdline.")
         log.error(f"disks that would be wiped: {[d['path'] for d in disks]}")
         log.error("pass confirm-wipe (interactive) or unattended (PXE/production) to proceed.")
+        sys.exit(1)
+
+    # confirm-wipe always asks, even if unattended is passed too: when the
+    # two conflict, the cautious one wins.
+    if confirm_wipe and not confirm.ask(disks, config_mod.zfs_raid(config), log):
+        log.error(f"wipe not confirmed -- no disk touched: {[d['path'] for d in disks]}")
         sys.exit(1)
 
     disks = partition.partition_disks(disks, log)
