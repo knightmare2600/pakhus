@@ -1,4 +1,4 @@
-"""First-boot integration -- plan.txt [first-boot]: fetch the script now and
+"""First-boot integration (the answer TOML's [first-boot]): fetch the script now and
 bake it into the image at /usr/local/bin/first-boot.sh, plus a oneshot
 systemd unit enabled to run it once the installed system is fully up.
 """

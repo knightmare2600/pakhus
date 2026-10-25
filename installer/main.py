@@ -1,7 +1,9 @@
 #!/usr/bin/env python3
 """pakhus installer entrypoint.
 
-Flow (plan.txt "Installer Execution Flow" / initrd-plan.txt Stage 2):
+Flow (Stage 2; the original plan.txt / initrd-plan.txt design docs were
+retired in klargoring 8a8eceb, their content folded into code comments and
+README.md -- see git history for the originals):
   load TOML -> validate -> detect hardware -> confirm-wipe gate ->
   partition disks -> create ZFS pool -> debootstrap target -> chroot
   configuration -> Proxmox repo+packages -> GRUB+hostid -> first-boot
@@ -10,7 +12,7 @@ Flow (plan.txt "Installer Execution Flow" / initrd-plan.txt Stage 2):
 Runs as pakhus-installer.service (After=network-online.target), so DHCP is
 already up. toml_url= and the safety flags come from /proc/cmdline, same
 place the site-specific iPXE menu.ipxe already puts toml_url for the
-Stage-0 build (see project_provisioning_estate memory / initrd-plan.txt).
+Stage-0 build (see README.md, "Booting via iPXE").
 """
 import subprocess
 import sys

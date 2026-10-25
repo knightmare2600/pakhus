@@ -1,6 +1,6 @@
 """ZFS root pool creation: a mirror (zfs.raid = "raid1", the standard
 build) or a single disk (zfs.raid = "raid0", the degraded build -- see
-config.RAID_DISK_COUNT). Properties per plan.txt verbatim: ashift=12,
+config.RAID_DISK_COUNT). Pool properties: ashift=12,
 compression=lz4, atime=off, xattr=sa, acltype=posixacl.
 
 Uses zpool's -R altroot instead of manually managing mountpoints -- datasets

@@ -1,5 +1,4 @@
-"""Disk detection and validation -- plan.txt "Hardware Detection"/"Safety
-Features": log what was found, and refuse to touch anything that isn't a
+"""Disk detection and validation: log what was found, and refuse to touch anything that isn't a
 plain, unmounted, sufficiently-large block device named in disk-list.
 """
 import os

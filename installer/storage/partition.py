@@ -1,5 +1,5 @@
 """GPT partitioning via sgdisk -- same tool Proxmox's own installer uses,
-more scriptable than parted. Layout per plan.txt, per disk:
+more scriptable than parted. Layout, per disk:
   1: BIOS boot partition (1MiB,   type EF02) -- legacy grub-pc embedding area
   2: EFI system partition (512MiB, type EF00, fat32)
   3: ZFS partition (rest of disk,  type BF01)

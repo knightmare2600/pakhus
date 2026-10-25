@@ -1,6 +1,6 @@
 """Loads and validates the Proxmox-compatible answer TOML.
 
-Per plan.txt: parse this directly, don't translate it into some other
+By design: parse this directly, don't translate it into some other
 internal schema. Downstream modules read straight out of the dict this
 returns (e.g. config["global"]["fqdn"]).
 """

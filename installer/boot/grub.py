@@ -100,7 +100,7 @@ def install(chroot, disks, root_dataset, log):
     shutil.copy2("/etc/zfs/zpool.cache", f"{chroot.target}/etc/zfs/zpool.cache")
 
     log.info("generating /etc/hostid (must be set before initramfs regen, or the pool "
-             "won't reliably auto-import on the real first boot -- initrd-plan.txt Risk 4)")
+             "won't reliably auto-import on the real first boot)")
     chroot.run(["zgenhostid", "-f"])
 
     _write_grub_defaults(chroot, root_dataset)

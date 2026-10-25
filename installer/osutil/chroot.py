@@ -1,8 +1,7 @@
 """Bind-mount + chroot helper, and target-system configuration (hostname,
 hosts, timezone, locale, keyboard, fstab, root password/SSH key injection).
 
-Same file as plan.txt's os/chroot.py -- just under osutil/ instead of os/,
-since installer/os/ would shadow the stdlib os module for the whole process
+Lives under osutil/ rather than os/, since installer/os/ would shadow the stdlib os module for the whole process
 (main.py's own directory lands at sys.path[0] when run as a script, and a
 subpackage literally named os/ sitting there wins over the real stdlib os
 for every `import os` anywhere in the interpreter).
@@ -23,8 +22,8 @@ MOUNTS = ("proc", "sys", "dev", "dev/pts", "run")
 # depending on each call site remembering to set it.
 CHROOT_ENV = {**os.environ, "DEBIAN_FRONTEND": "noninteractive"}
 
-# TOML has no explicit locale field (plan.txt's own [global] example only
-# has keyboard/country/fqdn/mailto/timezone) -- derive a sane default from
+# TOML has no explicit locale field (the Proxmox answer format's [global]
+# has keyboard/country/fqdn/mailto/timezone, no locale) -- derive a sane default from
 # country. Extend as real sites need it.
 LOCALE_BY_COUNTRY = {
     "gb": "en_GB.UTF-8",

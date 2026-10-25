@@ -1,4 +1,4 @@
-"""Logging setup. Per plan.txt: log everything to /var/log/pakhus/install.log,
+"""Logging setup: log everything to /var/log/pakhus/install.log,
 in addition to stdout (which pakhus-installer.service already sends to both the
 journal and the console).
 """
