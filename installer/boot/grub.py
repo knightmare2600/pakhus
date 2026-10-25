@@ -56,7 +56,7 @@ def install(chroot, disks, root_dataset, log):
     # ONE of grub-pc / grub-efi-amd64 via an unconstrained "grub-pc |
     # grub-efi-amd64" alternative -- apt's solver picks without inspecting
     # real firmware, so whichever it landed on may not match this machine's
-    # actual boot mode. Whether proxmox-backup's chain does the same is
+    # actual boot mode. Whether proxmox-datacenter-manager-meta's chain does the same is
     # unverified; the logic below is correct either way, since it installs
     # the right package explicitly regardless of what is already there.
     # Detect real firmware mode from THIS booted environment (running on

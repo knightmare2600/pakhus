@@ -1,14 +1,15 @@
-# Example saekkevogn / Proxmox answer file. This is a generic template
+# Example pakhus / Proxmox answer file. This is a generic template
 # (see plan.txt "Input Format") -- not a real site's file. Real per-site
-# files live on the provisioning server as bootstrap/web/proxmox/<SITE>-pbs-answer.toml
-# and are fetched dynamically by menu.ipxe, never checked in here. The -pbs-
-# infix is a presumption pending confirmation: <SITE>-answer.toml at that
-# same path is already Klargøring's (PVE) answer file, so PBS needs its own.
+# files live on the provisioning server as bootstrap/web/proxmox/<SITE>-pdm-answer.toml
+# and are fetched dynamically by menu.ipxe, never checked in here. The -pdm-
+# infix is a presumption pending confirmation, following Sækkevogn's -pbs-:
+# <SITE>-answer.toml at that same path is already Klargøring's (PVE) answer
+# file and <SITE>-pbs-answer.toml Sækkevogn's (PBS), so PDM needs its own.
 
 [global]
 keyboard = "en-gb"
 country = "gb"
-fqdn = "pbs-install.example.internal"
+fqdn = "pdm-install.example.internal"
 mailto = "root@example.internal"
 timezone = "Europe/London"
 
@@ -29,4 +30,4 @@ disk-list = ["sda", "sdb"]
 [first-boot]
 source = "from-url"
 ordering = "fully-up"
-url = "http://192.168.139.50/proxmox/pbs-first-boot.sh"
+url = "http://192.168.139.50/proxmox/pdm-first-boot.sh"

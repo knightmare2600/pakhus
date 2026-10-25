@@ -21,10 +21,10 @@ set -euo pipefail
 ARCH="${ARCH:-amd64}"
 SRCDIR="$(realpath "${1:?usage: $0 <initrd-build-output-dir> [iso-output-dir]}")/$ARCH"
 OUTDIR="$(realpath -m "${2:-$(pwd)/output}")/$ARCH"
-WORKDIR="$(mktemp -d /var/tmp/saekkevogn-iso-build.XXXXXX)"
+WORKDIR="$(mktemp -d /var/tmp/pakhus-iso-build.XXXXXX)"
 ISOROOT="$WORKDIR/isoroot"
 
-log() { echo "[saekkevogn-iso-build] $*" >&2; }
+log() { echo "[pakhus-iso-build] $*" >&2; }
 
 trap 'rm -rf "$WORKDIR"' EXIT
 
@@ -63,8 +63,8 @@ cp "$SRCDIR/vmlinuz" "$ISOROOT/boot/vmlinuz"
 cp "$SRCDIR/installer-initrd.img" "$ISOROOT/boot/installer-initrd.img"
 cp "$(dirname "$(realpath "$0")")/grub.cfg" "$ISOROOT/boot/grub/grub.cfg"
 
-log "grub-mkrescue ($ARCH, $GRUB_PLATFORM) -> $OUTDIR/saekkevogn-installer.iso"
-grub-mkrescue -o "$OUTDIR/saekkevogn-installer.iso" "$ISOROOT" >&2
+log "grub-mkrescue ($ARCH, $GRUB_PLATFORM) -> $OUTDIR/pakhus-installer.iso"
+grub-mkrescue -o "$OUTDIR/pakhus-installer.iso" "$ISOROOT" >&2
 
 log "done."
-du -h "$OUTDIR/saekkevogn-installer.iso"
+du -h "$OUTDIR/pakhus-installer.iso"

@@ -14,7 +14,7 @@ MOUNTS = ("proc", "sys", "dev", "dev/pts", "run")
 
 # Only one of the apt-get calls across this codebase originally set
 # DEBIAN_FRONTEND=noninteractive (the proxmox-ve install in Klargøring's
-# proxmox/packages.py, now the proxmox-backup install here) -- every other chroot.run()'d apt-get call was
+# proxmox/packages.py, the proxmox-backup install in Sækkevogn, now the PDM install here) -- every other chroot.run()'d apt-get call was
 # exposed to hanging forever on a package's own interactive debconf
 # prompt (confirmed: installing keyboard-configuration this way pops its
 # own keyboard-layout dialog with no real terminal to answer it, and the
@@ -163,15 +163,18 @@ def write_keyboard(chroot, keyboard, log):
 
 
 def write_network(target, log):
-    # PBS DIFFERENCE (2026-10-22), read this first: everything in the next
+    # PBS/PDM DIFFERENCE (2026-10-22, from Sækkevogn; re-checked for PDM
+    # 2026-10-25), read this first: everything in the next
     # two comments was observed on PVE in Klargøring. The "inet manual"
     # stanza and interfaces.new both come from ifupdown2's postinst
     # proxmox_compatibility() (checked in ifupdown2_3.3.0-1+pmx12's own
     # postinst), which begins with `exit if !$haspve_common` -- it only
     # does anything when PVE::INotify (libpve-common-perl, PVE-only) is
-    # installed. On PBS it exits immediately, so the in-place edit below
-    # finds nothing to change and the target would boot with no network
-    # configured at all. The fallback at the end of this function covers
+    # installed. On PBS it exits immediately, and on PDM too: nothing in
+    # PDM's dependency tree pulls in libpve-common-perl (checked against
+    # the PDM, PVE arm64 and qemus package metadata, 2026-10-25), so the
+    # in-place edit below finds nothing to change and the target would
+    # boot with no network configured at all. The fallback at the end of this function covers
     # that: it writes a DHCP stanza for the NIC this installer itself got
     # its lease on. The in-place edit is kept so the PVE-shaped case still
     # behaves exactly as it did in Klargøring.
@@ -239,10 +242,10 @@ def write_network(target, log):
                  "already configured -- leaving it alone")
         return
 
-    # The PBS case (see top of function). The installer runs on the same
+    # The PBS/PDM case (see top of function). The installer runs on the same
     # hardware and kernel family as the target, with the same udev
     # predictable-naming scheme, so the NIC name seen here is the one the
-    # installed system will see too. Unverified on real PBS hardware yet.
+    # installed system will see too. Unverified on real PBS or PDM hardware yet.
     iface = primary_interface(log)
     log.info(f"no non-lo interfaces in {path} -- adding auto {iface} / inet dhcp")
     if not lines:

@@ -1,17 +1,17 @@
-"""Logging setup. Per plan.txt: log everything to /var/log/saekkevogn/install.log,
-in addition to stdout (which saekkevogn-installer.service already sends to both the
+"""Logging setup. Per plan.txt: log everything to /var/log/pakhus/install.log,
+in addition to stdout (which pakhus-installer.service already sends to both the
 journal and the console).
 """
 import logging
 import os
 
-LOG_PATH = "/var/log/saekkevogn/install.log"
+LOG_PATH = "/var/log/pakhus/install.log"
 
 
 def setup():
     os.makedirs(os.path.dirname(LOG_PATH), exist_ok=True)
 
-    logger = logging.getLogger("saekkevogn")
+    logger = logging.getLogger("pakhus")
     logger.setLevel(logging.DEBUG)
 
     fmt = logging.Formatter("%(asctime)s %(levelname)s [%(name)s] %(message)s")
@@ -21,7 +21,7 @@ def setup():
     logger.addHandler(file_handler)
 
     console_handler = logging.StreamHandler()
-    console_handler.setFormatter(logging.Formatter("[saekkevogn] %(message)s"))
+    console_handler.setFormatter(logging.Formatter("[pakhus] %(message)s"))
     logger.addHandler(console_handler)
 
     return logger

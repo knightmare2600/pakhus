@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""saekkevogn installer entrypoint.
+"""pakhus installer entrypoint.
 
 Flow (plan.txt "Installer Execution Flow" / initrd-plan.txt Stage 2):
   load TOML -> validate -> detect hardware -> confirm-wipe gate ->
@@ -7,7 +7,7 @@ Flow (plan.txt "Installer Execution Flow" / initrd-plan.txt Stage 2):
   configuration -> Proxmox repo+packages -> GRUB+hostid -> first-boot
   service -> export pool -> reboot.
 
-Runs as saekkevogn-installer.service (After=network-online.target), so DHCP is
+Runs as pakhus-installer.service (After=network-online.target), so DHCP is
 already up. toml_url= and the safety flags come from /proc/cmdline, same
 place the site-specific iPXE menu.ipxe already puts toml_url for the
 Stage-0 build (see project_provisioning_estate memory / initrd-plan.txt).
@@ -92,7 +92,7 @@ def main(log):
         packages.install(ch, arch, log)
         # packages.install() is what installs ifupdown2 (and, on PVE, what
         # generated /etc/network/interfaces' "inet manual" stanza) -- must
-        # run after it, not before. See write_network() for the PBS case.
+        # run after it, not before. See write_network() for the PBS/PDM case.
         chroot_mod.write_network(target, log)
         grub.install(ch, disks, zfs.ROOT_DATASET, log)
         firstboot.install(ch, config["first-boot"], log)

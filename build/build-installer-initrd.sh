@@ -3,7 +3,7 @@
 #
 # debootstraps a Debian Trixie rootfs, installs install-time tooling into it,
 # runs systemd as PID 1 (/init -> /sbin/init, networking via systemd-networkd)
-# with a oneshot saekkevogn-installer.service running ../installer/main.py -- the
+# with a oneshot pakhus-installer.service running ../installer/main.py -- the
 # real Stage 2 installer (disk detection, ZFS mirror, target debootstrap,
 # Proxmox repo+packages, GRUB, first-boot service) -- then packs the whole
 # rootfs into an xz'd cpio initrd alongside its matching kernel. This script
@@ -55,10 +55,10 @@ MIRROR="http://deb.debian.org/debian/"
 # Per-architecture output subfolder -- amd64 and arm64 builds never overwrite
 # each other, and every downstream write below just uses $OUTDIR unchanged.
 OUTDIR="$(realpath -m "${1:-$(pwd)/output}")/$ARCH"
-WORKDIR="$(mktemp -d /var/tmp/saekkevogn-initrd-build.XXXXXX)"
+WORKDIR="$(mktemp -d /var/tmp/pakhus-initrd-build.XXXXXX)"
 ROOTFS="$WORKDIR/rootfs"
 
-log() { echo "[saekkevogn-build] $*" >&2; }
+log() { echo "[pakhus-build] $*" >&2; }
 
 cleanup() {
   log "cleaning up bind mounts under $ROOTFS"
@@ -180,17 +180,17 @@ EOF
 done
 
 # Remote debug access via sshd, deliberately username+password
-# (root/saekkevogn) rather than a baked-in key: this project is intended
+# (root/pakhus) rather than a baked-in key: this project is intended
 # to go public, and a private key baked into a publicly-distributed image
 # either exposes an estate-internal credential or is useless to anyone
 # outside that estate. A documented, fixed default credential -- for this
 # transient, PXE-booted installer environment only, never the installed
 # target -- works for everyone who has the image, which is the actual
 # point of it being public.
-log "setting root:saekkevogn and enabling sshd for remote debug access"
-chroot "$ROOTFS" bash -c 'echo "root:saekkevogn" | chpasswd'
+log "setting root:pakhus and enabling sshd for remote debug access"
+chroot "$ROOTFS" bash -c 'echo "root:pakhus" | chpasswd'
 mkdir -p "$ROOTFS/etc/ssh/sshd_config.d"
-cat > "$ROOTFS/etc/ssh/sshd_config.d/saekkevogn-debug.conf" <<'EOF'
+cat > "$ROOTFS/etc/ssh/sshd_config.d/pakhus-debug.conf" <<'EOF'
 PermitRootLogin yes
 PasswordAuthentication yes
 EOF
@@ -206,23 +206,23 @@ chroot "$ROOTFS" systemctl enable ssh.service
 # time, so this has to happen at runtime, not build time, or every booted
 # instance would share one fixed hostname. Runs as early as possible
 # (sysinit.target, Before= anything that might display/advertise it) so
-# getty/sshd/saekkevogn-installer all see the real value, not a placeholder.
-cat > "$ROOTFS/etc/systemd/system/saekkevogn-random-hostname.service" <<'EOF'
+# getty/sshd/pakhus-installer all see the real value, not a placeholder.
+cat > "$ROOTFS/etc/systemd/system/pakhus-random-hostname.service" <<'EOF'
 [Unit]
-Description=saekkevogn random hostname
-Before=getty@tty1.service serial-getty@ttyS0.service ssh.service saekkevogn-installer.service
+Description=pakhus random hostname
+Before=getty@tty1.service serial-getty@ttyS0.service ssh.service pakhus-installer.service
 DefaultDependencies=no
 Conflicts=shutdown.target
 
 [Service]
 Type=oneshot
 RemainAfterExit=yes
-ExecStart=/bin/sh -c 'h="saekkevogn-$(head -c4 /dev/urandom | od -An -tx1 | tr -d " \n")"; echo "$h" > /etc/hostname; hostname "$h"'
+ExecStart=/bin/sh -c 'h="pakhus-$(head -c4 /dev/urandom | od -An -tx1 | tr -d " \n")"; echo "$h" > /etc/hostname; hostname "$h"'
 
 [Install]
 WantedBy=sysinit.target
 EOF
-chroot "$ROOTFS" systemctl enable saekkevogn-random-hostname.service
+chroot "$ROOTFS" systemctl enable pakhus-random-hostname.service
 
 # No automatic interactive keyboard-layout picker: every real deployment
 # of this initrd runs unattended over PXE, so a prompt requiring physical
@@ -232,29 +232,29 @@ chroot "$ROOTFS" systemctl enable saekkevogn-random-hostname.service
 # keyboard-configuration` interactively) -- kbd is installed for exactly
 # this, on demand, not on every boot.
 
-log "[7/10] installing the saekkevogn installer package + service unit"
+log "[7/10] installing the pakhus installer package + service unit"
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-mkdir -p "$ROOTFS/opt/saekkevogn"
-cp -a "$REPO_ROOT/installer" "$ROOTFS/opt/saekkevogn/installer"
-chmod +x "$ROOTFS/opt/saekkevogn/installer/main.py"
+mkdir -p "$ROOTFS/opt/pakhus"
+cp -a "$REPO_ROOT/installer" "$ROOTFS/opt/pakhus/installer"
+chmod +x "$ROOTFS/opt/pakhus/installer/main.py"
 
-cat > "$ROOTFS/etc/systemd/system/saekkevogn-installer.service" <<'EOF'
+cat > "$ROOTFS/etc/systemd/system/pakhus-installer.service" <<'EOF'
 [Unit]
-Description=saekkevogn installer
+Description=pakhus installer
 After=network-online.target
 Wants=network-online.target
 
 [Service]
 Type=oneshot
 RemainAfterExit=yes
-ExecStart=/usr/bin/python3 /opt/saekkevogn/installer/main.py
+ExecStart=/usr/bin/python3 /opt/pakhus/installer/main.py
 StandardOutput=journal+console
 StandardError=journal+console
 
 [Install]
 WantedBy=multi-user.target
 EOF
-chroot "$ROOTFS" systemctl enable saekkevogn-installer.service
+chroot "$ROOTFS" systemctl enable pakhus-installer.service
 
 log "[8/10] extracting matching kernel"
 KERNEL="$(ls "$ROOTFS"/boot/vmlinuz-* | sort -V | tail -1)"
