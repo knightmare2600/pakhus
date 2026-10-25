@@ -109,11 +109,12 @@ one build), so always take both from the same release.
 ## How it works
 
 1. iPXE boots the kernel + initrd (systemd as PID 1).
-2. The initrd brings up networking via DHCP, fetches the answer TOML from
-   `toml_url=` on the kernel cmdline, and parses it directly with
-   Python's `tomllib` (no intermediate schema).
-3. It partitions the target disks, creates a ZFS mirror, and debootstraps
-   Debian Trixie onto it.
+2. The initrd brings up networking via DHCP, counts the machine's disks
+   (if `toml_url_degraded=` is given), fetches the standard or degraded
+   answer TOML, and parses it directly with Python's `tomllib` (no
+   intermediate schema).
+3. It partitions the target disks, creates a ZFS mirror (or a single-disk
+   pool for the degraded build), and debootstraps Debian Trixie onto it.
 4. Inside a chroot on the target: hostname/hosts/timezone/locale/keyboard,
    root password hash + SSH key injection, the Proxmox repo + PDM
    packages (see [Architectures](#architectures) for where each comes
@@ -232,8 +233,9 @@ build/
                         GitHub Release, amd64 + arm64 as a matrix
 
 examples/
-  answer.toml          generic template -- real per-site files are never
-                        checked in here
+  answer.toml          generic template (2-disk mirror) -- real per-site
+                        files are never checked in here
+  degraded.toml        generic single-disk template (zfs.raid = "raid0")
 ```
 
 ## Building
@@ -303,20 +305,22 @@ server under these paths (asset names checked against
 iseq ${arch} arm64 && goto pakhus-arm64 || goto pakhus-amd64
 
 :pakhus-amd64
-kernel ${boot-url}/proxmox/pakhus/amd64/vmlinuz toml_url=${boot-url}/proxmox/${site-prefix}-pdm-answer.toml confirm-wipe no-reboot
+kernel ${boot-url}/proxmox/pakhus/amd64/vmlinuz toml_url=${boot-url}/proxmox/${site-prefix}-pdm-answer.toml toml_url_degraded=${boot-url}/proxmox/${site-prefix}-pdm-degraded.toml confirm-wipe no-reboot
 initrd ${boot-url}/proxmox/pakhus/amd64/installer-initrd.img
 boot
 
 :pakhus-arm64
-kernel ${boot-url}/proxmox/pakhus/arm64/vmlinuz-arm64 toml_url=${boot-url}/proxmox/${site-prefix}-pdm-answer.toml confirm-wipe no-reboot
+kernel ${boot-url}/proxmox/pakhus/arm64/vmlinuz-arm64 toml_url=${boot-url}/proxmox/${site-prefix}-pdm-answer.toml toml_url_degraded=${boot-url}/proxmox/${site-prefix}-pdm-degraded.toml confirm-wipe no-reboot
 initrd ${boot-url}/proxmox/pakhus/arm64/installer-initrd-arm64.img
 boot
 ```
 
 `${site-prefix}-pdm-answer.toml` follows Sækkevogn's `-pbs-` convention;
 the `-pdm-` naming is a presumption pending confirmation. The estate's
-`VRK-pdm-answer.toml` and `FRD-pdm-answer.toml` exist as of 2026-10-25,
-and both pass `installer/config.py`'s validation. As with every entry in that menu, the
+`VRK-pdm-answer.toml` and `FRD-pdm-answer.toml` (2-disk mirror) exist as
+of 2026-10-25, plus `VRK-pdm-degraded.toml` and `FRD-pdm-degraded.toml`
+(single disk), and all four pass `installer/config.py`'s validation. As
+with every entry in that menu, the
 site is resolved in iPXE (gateway-based detection setting `${site-prefix}`
 and `${boot-url}`) — never hardcode one site's URL into a shared menu
 entry.
@@ -332,12 +336,21 @@ without touching any disk.
 
 ## Kernel cmdline options
 
-- `toml_url=<url>`: **required**. Fetched with `curl -fsSL`, over plain
-  HTTP in every example here. Bear that in mind if the file carries
-  secrets (password hash, SSH keys) over an untrusted network.
-- `confirm-wipe`: interactive/manual runs. An operator must confirm at
-  the console before any disk is touched.
-- `unattended`: production PXE use. Skips the confirmation.
+- `toml_url=<url>`: **required**. The standard answer file. Fetched with
+  `curl -fsSL`, over plain HTTP in every example here. Bear that in mind
+  if the file carries secrets (password hash, SSH keys) over an untrusted
+  network.
+- `toml_url_degraded=<url>`: optional. The single-disk answer file. When
+  given, the installer counts whole disks the same way the estate's
+  `select-pve-answer.sh` does for PVE (`/sys/block`, skipping `loop`,
+  `ram`, `sr`, `fd` and `dm-` devices): 2 or more uses `toml_url=`, fewer
+  uses this one and logs that the build is "single-disk, NOT production
+  ready". Without it, `toml_url=` is always used.
+- `confirm-wipe`: intended for interactive/manual runs. **It currently
+  doesn't prompt.** The code only checks that `confirm-wipe` or
+  `unattended` is present, so today the two behave identically and the
+  disks are wiped without asking.
+- `unattended`: production PXE use.
 - `no-reboot`: stay up after a successful install, for inspection.
 
 **The installer refuses to touch any disk unless `confirm-wipe` or
@@ -377,9 +390,12 @@ automated installer formally covers PDM with this format is unverified;
 Pakhus doesn't depend on that, since it parses the file itself. Currently
 supported:
 
-- `disk-setup.filesystem = "zfs"` with `zfs.raid = "raid1"` across
-  exactly 2 disks (the dotted-key fix from Sækkevogn/Klargøring
-  `c1c9fd3` is included).
+- `disk-setup.filesystem = "zfs"` with either `zfs.raid = "raid1"` across
+  exactly 2 disks (the standard build), or `zfs.raid = "raid0"` on
+  exactly 1 disk (the degraded build, replicating the estate's PVE
+  `<SITE>-degraded.toml`; see `examples/degraded.toml`). Anything else,
+  including `raid0` striped across several disks, is rejected. The
+  dotted-key fix from Sækkevogn/Klargøring `c1c9fd3` is included.
 - `network.source = "from-dhcp"`
 - `first-boot.source = "from-url"`
 

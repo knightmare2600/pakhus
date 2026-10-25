@@ -52,6 +52,19 @@ def main(log):
         log.info("no toml_url= on kernel cmdline -- nothing to do")
         return
 
+    # Replicates the estate's select-pve-answer.sh for PVE: 2+ disks gets
+    # the standard (mirror) answer file, fewer gets the degraded
+    # (single-disk) one. menu.ipxe passes both URLs explicitly; without
+    # toml_url_degraded= the standard file is always used, as before.
+    degraded_url = cmdline_arg("toml_url_degraded")
+    if degraded_url:
+        present = detect.count_disks()
+        log.info(f"detected {len(present)} disk(s): {', '.join(present) or 'none'}")
+        if len(present) < 2:
+            log.warning("fewer than 2 disks -- using the degraded build "
+                        "(single-disk, NOT production ready)")
+            toml_url = degraded_url
+
     log.info(f"fetching answer file: {toml_url}")
     config = config_mod.load(fetch_toml(toml_url))
 
@@ -68,7 +81,7 @@ def main(log):
         sys.exit(1)
 
     disks = partition.partition_disks(disks, log)
-    target = zfs.create_pool(disks, log)
+    target = zfs.create_pool(disks, config_mod.zfs_raid(config), log)
 
     debootstrap.bootstrap(target, log)
 

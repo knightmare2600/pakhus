@@ -57,3 +57,14 @@ def detect(disk_names, log):
         disks.append({"name": name, "path": f"/dev/{name}", "size": size, "model": model})
 
     return disks
+
+
+# Same exclusions as the estate's select-pve-answer.sh disk count, which
+# picks PVE's -answer vs -degraded build -- whole disks only (/sys/block,
+# not /sys/class/block, which also lists partitions).
+NOT_DISKS = ("loop", "ram", "sr", "fd", "dm-")
+
+
+def count_disks():
+    """Whole disks present, as select-pve-answer.sh counts them."""
+    return sorted(n for n in os.listdir("/sys/block") if not n.startswith(NOT_DISKS))

@@ -1,4 +1,6 @@
-"""ZFS mirror pool creation. Properties per plan.txt verbatim: ashift=12,
+"""ZFS root pool creation: a mirror (zfs.raid = "raid1", the standard
+build) or a single disk (zfs.raid = "raid0", the degraded build -- see
+config.RAID_DISK_COUNT). Properties per plan.txt verbatim: ashift=12,
 compression=lz4, atime=off, xattr=sa, acltype=posixacl.
 
 Uses zpool's -R altroot instead of manually managing mountpoints -- datasets
@@ -12,9 +14,11 @@ POOL = "rpool"
 ROOT_DATASET = f"{POOL}/ROOT/debian"
 
 
-def create_pool(disks, log):
+def create_pool(disks, raid, log):
     zfs_parts = [d["partitions"]["zfs"] for d in disks]
-    log.info(f"creating {POOL} mirror across {zfs_parts}")
+    # A single-disk pool is a plain vdev; zpool has no "raid0" keyword.
+    vdev = ["mirror", *zfs_parts] if raid == "raid1" else zfs_parts
+    log.info(f"creating {POOL} ({raid}) on {zfs_parts}")
 
     subprocess.run([
         "zpool", "create", "-f",
@@ -25,7 +29,7 @@ def create_pool(disks, log):
         "-O", "acltype=posixacl",
         "-O", "mountpoint=none",
         "-R", TARGET,
-        POOL, "mirror", *zfs_parts,
+        POOL, *vdev,
     ], check=True)
 
     subprocess.run(["zfs", "create", "-p", "-o", "mountpoint=/", ROOT_DATASET], check=True)

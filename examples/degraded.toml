@@ -1,0 +1,38 @@
+# Example pakhus degraded (single-disk, NOT production ready) answer file --
+# identical to answer.toml except zfs.raid = "raid0" and a one-disk disk-list, the same
+# relationship as the estate's PVE <SITE>-degraded.toml to <SITE>-answer.toml. Picked by
+# the installer when toml_url_degraded= is given and fewer than 2 disks are present.
+#
+# Example pakhus / Proxmox answer file. This is a generic template
+# (see plan.txt "Input Format") -- not a real site's file. Real per-site
+# files live on the provisioning server as bootstrap/web/proxmox/<SITE>-pdm-answer.toml
+# and are fetched dynamically by menu.ipxe, never checked in here. The -pdm-
+# infix is a presumption pending confirmation, following Sækkevogn's -pbs-:
+# <SITE>-answer.toml at that same path is already Klargøring's (PVE) answer
+# file and <SITE>-pbs-answer.toml Sækkevogn's (PBS), so PDM needs its own.
+
+[global]
+keyboard = "en-gb"
+country = "gb"
+fqdn = "pdm-install.example.internal"
+mailto = "root@example.internal"
+timezone = "Europe/London"
+
+root-password-hashed = "$6$replace-me-with-a-real-hash$..."
+
+root-ssh-keys = [
+  "ssh-rsa AAAA...replace-with-a-real-key... user@host"
+]
+
+[network]
+source = "from-dhcp"
+
+[disk-setup]
+filesystem = "zfs"
+zfs.raid = "raid0"
+disk-list = ["sda"]
+
+[first-boot]
+source = "from-url"
+ordering = "fully-up"
+url = "http://192.168.139.50/proxmox/pdm-first-boot.sh"
