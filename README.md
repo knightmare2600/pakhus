@@ -316,7 +316,7 @@ boot
 ```
 
 `${site-prefix}-pdm-answer.toml` follows Sækkevogn's `-pbs-` convention;
-the `-pdm-` naming is a presumption pending confirmation. The estate's
+Robert confirmed the `-pdm-` naming on 2026-10-25. The estate's
 `VRK-pdm-answer.toml` and `FRD-pdm-answer.toml` (2-disk mirror) exist as
 of 2026-10-25, plus `VRK-pdm-degraded.toml` and `FRD-pdm-degraded.toml`
 (single disk), and all four pass `installer/config.py`'s validation. As

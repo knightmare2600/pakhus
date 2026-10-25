@@ -3,7 +3,7 @@
 # answer TOML") -- not a real site's file. Real per-site
 # files live on the provisioning server as bootstrap/web/proxmox/<SITE>-pdm-answer.toml
 # and are fetched dynamically by menu.ipxe, never checked in here. The -pdm-
-# infix is a presumption pending confirmation, following Sækkevogn's -pbs-:
+# infix (confirmed by Robert, 2026-10-25) follows Sækkevogn's -pbs-:
 # <SITE>-answer.toml at that same path is already Klargøring's (PVE) answer
 # file and <SITE>-pbs-answer.toml Sækkevogn's (PBS), so PDM needs its own.
 
