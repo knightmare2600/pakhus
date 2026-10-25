@@ -39,7 +39,7 @@ with the stock swapped.
 
 | | amd64 | arm64 |
 |---|---|---|
-| Initrd + kernel + ISO build (CI) | ❌ not yet run for Pakhus | ❌ not yet run for Pakhus |
+| Initrd + kernel + ISO build (CI) | ✅ `pakhus-20261025-trixie-1` | ✅ `pakhus-20261025-trixie-1` |
 | Install on real hardware | ❌ not yet tested | ❌ not yet tested |
 | PDM server packages | official (PDM repo) | **unofficial** (qemus, see [arm64](#arm64)) |
 
@@ -49,6 +49,10 @@ everything up to and including `7396e95` is Sækkevogn's, and up to
 Klargøring's or Sækkevogn's verification carries over automatically.
 What *has* been verified for Pakhus (2026-10-25):
 
+- **Builds:** GitHub Actions run `40183728834` (2026-10-25, 9 minutes)
+  built the initrd, kernel and ISO for both arches and published release
+  `pakhus-20261025-trixie-1`. The installer kernel is Debian's
+  `6.12.107+deb13` on both.
 - **Repo and packages:** the PDM repo URI/suite/component and metapackage
   name, against pdm.proxmox.com/docs/installation.html and the live repo's
   own `Release`/`Packages` indexes. The PDM docs publish the same Proxmox
@@ -73,8 +77,8 @@ What *has* been verified for Pakhus (2026-10-25):
   fetched through apt's own signature checking, temporary apt state
   cleaned up.
 
-Not yet verified: a CI build, a real install and first boot on either
-arch, and apt's version-constraint resolution on a real arm64 system.
+Not yet verified: a real install and first boot on either arch, and
+apt's version-constraint resolution on a real arm64 system.
 
 ## Why this exists
 
@@ -88,13 +92,14 @@ in an estate are all built the same way.
 
 ## Getting it
 
-There are no Pakhus releases yet. Once CI has run they appear on this
-repo's Releases page as `pakhus-<date>-<suite>-<run>`, one set per arch:
+Ready-built files are on the
+[Releases](https://github.com/knightmare2600/pakhus/releases) page
+(latest: `pakhus-20261025-trixie-1`), one set per arch:
 
 | Asset | What it is |
 |---|---|
 | `vmlinuz-<arch>` | installer kernel |
-| `installer-initrd-<arch>.img` | installer initrd |
+| `installer-initrd-<arch>.img` | installer initrd (~230MB amd64, ~207MB arm64) |
 | `KERNEL_VERSION-<arch>` | the kernel's version string |
 | `pakhus-installer-<arch>.iso` | both of the above wrapped in a bootable ISO |
 
@@ -241,9 +246,8 @@ Actions → "Build installer initrd + ISO" → Run workflow, or:
 gh workflow run build.yml --repo knightmare2600/pakhus -f debian_suite=trixie
 ```
 
-The `--repo` value presumes the GitHub repo will be
-`knightmare2600/pakhus`; it doesn't exist yet. `workflow_dispatch` only.
-It builds both arches as a matrix — arm64 on GitHub's native
+`workflow_dispatch` only (each run debootstraps from scratch, about 9
+minutes). It builds both arches as a matrix — arm64 on GitHub's native
 `ubuntu-24.04-arm` runner, not emulation — and publishes everything as
 one GitHub Release tagged `pakhus-<date>-<suite>-<run-number>`, or
 whatever tag you pass as `release_tag`. GitHub Releases are a flat
@@ -287,11 +291,12 @@ build. Produces `<output-dir>/<ARCH>/pakhus-installer.iso`.
 
 ## Booting via iPXE
 
-**Not yet in the estate's `menu.ipxe`.** This is the proposed stanza,
-mirroring Sækkevogn's (including its asymmetric layout: arm64 filenames
-suffixed, amd64 ones not). Adding it, and the matching
-`benarbejde/asset_manifest.json` entries, is a separate change in that
-repo:
+The estate's `menu.ipxe` carries this (added in v2.18, replacing the old
+`:proxmox-dcm` placeholder), mirroring Sækkevogn's stanza, including its
+asymmetric layout: arm64 filenames suffixed, amd64 ones not. Its
+`benarbejde/asset_manifest.json` fetches the release assets onto the web
+server under these paths (asset names checked against
+`pakhus-20261025-trixie-1`):
 
 ```
 :pakhus
@@ -379,7 +384,7 @@ supported:
 
 ## Known limitations
 
-- Untested end to end, and not yet built in CI (see [Status](#status)).
+- Untested on real hardware (see [Status](#status)).
 - arm64: the PDM server, client and UI packages are unofficial and don't
   update via apt (see [arm64](#arm64)).
 - No remotes are added, and that is deliberate. The installed PDM comes
