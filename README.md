@@ -353,7 +353,7 @@ without touching any disk.
   on either one. Anything else, or no usable console, aborts without
   touching a disk. While the prompt is up, the autologin shells on those
   two consoles are stopped (they'd otherwise take half the keystrokes) and
-  restarted afterwards; SSH still works. If `unattended` is passed as
+  restarted afterwards; SSH keeps working if you'd started it. If `unattended` is passed as
   well, `confirm-wipe` wins and it still asks.
 - `unattended`: production PXE use. No prompt: proceeds straight to
   wiping the disks listed in the answer file.
@@ -374,11 +374,14 @@ toml_url=http://192.168.139.50/proxmox/VRK-pdm-answer.toml unattended
 
 - Console autologin as root on `tty1` and `ttyS0`, except while the
   `confirm-wipe` prompt is waiting for an answer.
-- SSH: `ssh root@<hostname-or-ip>`, password `pakhus`. Deliberately a
+- SSH is off until you run `systemctl start ssh` at the console (it
+  generates host keys on start). Then `ssh root@<hostname-or-ip>`,
+  password `pakhus`. Deliberately a
   documented password rather than a baked-in key, since the image is
   public. It applies only to the transient installer environment, never
   the installed target, which gets the TOML's password hash and SSH keys.
-  Host keys are generated fresh per boot.
+  Host keys are never baked in; each boot generates its own the first
+  time `ssh` is started.
 - Hostname is randomised per boot (`pakhus-<8 hex chars>`).
 - `journalctl -u pakhus-installer --no-pager` for the installer's output
   (also in `/var/log/pakhus/install.log`), and `cat /run/answer.toml` for

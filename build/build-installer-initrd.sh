@@ -187,7 +187,7 @@ done
 # transient, PXE-booted installer environment only, never the installed
 # target -- works for everyone who has the image, which is the actual
 # point of it being public.
-log "setting root:pakhus and enabling sshd for remote debug access"
+log "setting root:pakhus and configuring sshd (off until started by hand) for remote debug access"
 chroot "$ROOTFS" bash -c 'echo "root:pakhus" | chpasswd'
 mkdir -p "$ROOTFS/etc/ssh/sshd_config.d"
 cat > "$ROOTFS/etc/ssh/sshd_config.d/pakhus-debug.conf" <<'EOF'
@@ -196,11 +196,27 @@ PasswordAuthentication yes
 EOF
 # openssh-server's own postinst already generated host keys during package
 # install above -- baked into the image, every deployed instance would
-# otherwise share the exact same SSH host keys. Remove them; ssh.service's
-# own dependency chain (ssh-keygen@ units) regenerates fresh ones the
-# first time each actual instance boots.
+# otherwise share the exact same SSH host keys. Remove them, and generate
+# fresh ones whenever ssh.service starts. An earlier version of this comment
+# said "ssh-keygen@ units" did that; Debian has no such units. It has
+# sshd-keygen.service, which needs ConditionFirstBoot and never ran here
+# (confirmed on a real boot, 2026-11-01: no host keys, so ssh.service's
+# `sshd -t` failed until systemd gave up with "start request repeated too
+# quickly"). Drop-ins append to ExecStartPre=, which would leave the key
+# generation running after that failing check, so the list is reset first.
 rm -f "$ROOTFS"/etc/ssh/ssh_host_*_key*
-chroot "$ROOTFS" systemctl enable ssh.service
+mkdir -p "$ROOTFS/etc/systemd/system/ssh.service.d"
+cat > "$ROOTFS/etc/systemd/system/ssh.service.d/host-keys.conf" <<'EOF'
+[Service]
+ExecStartPre=
+ExecStartPre=/usr/bin/ssh-keygen -A
+ExecStartPre=/usr/sbin/sshd -t
+EOF
+# Off unless explicitly wanted: the fixed debug password above is only
+# acceptable if sshd isn't listening by default. openssh-server's postinst
+# enables it, so this has to be undone here. `systemctl start ssh` at the
+# console turns it on for that boot.
+chroot "$ROOTFS" systemctl disable ssh.service
 
 # Random hostname per boot: the initrd is the same static cpio image every
 # time, so this has to happen at runtime, not build time, or every booted
